@@ -22,3 +22,6 @@ HANDOFF.md
 
 # local tooling
 .claude/
+
+# XO Space metadata
+.xo/
