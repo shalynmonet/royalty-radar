@@ -59,12 +59,25 @@ python check_job.py <job_id>
 
 The first real scan has a ~20-30s cold start; polling times out after 180s.
 
+## Dashboard
+
+```bash
+pip install -r requirements-ui.txt   # adds Streamlit; the core tool doesn't need it
+streamlit run app.py
+```
+
+Two views: **Check a track** (upload a file or paste a URL, with a mock mode that
+costs no credits) and **Results** (everything in `results_log.jsonl`, including
+scans run by an agent through `scan_batch.py`).
+
 ## Files
 
 ```
 detect.py         submit, poll, branch on verdict, log
 extract_audio.py  ffmpeg wrapper: video -> WAV
 check_job.py      look up an existing job_id
+scan_batch.py     scan several sources, print one verdict table
+app.py            optional Streamlit dashboard
 ```
 
 ## Honesty about uncertainty

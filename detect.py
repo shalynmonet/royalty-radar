@@ -120,6 +120,7 @@ def handle_result(source_file, result):
         "source_file": source_file,
         "verdict": verdict,
         "confidence": result.get("confidence"),
+        "origin": result.get("origin"),
         "output_type": output_type,
         "content": content,
     }

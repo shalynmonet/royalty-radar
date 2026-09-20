@@ -19,3 +19,6 @@ extracted_audio.wav
 
 # local handoff notes
 HANDOFF.md
+
+# local tooling
+.claude/
