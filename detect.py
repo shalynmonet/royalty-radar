@@ -2,9 +2,13 @@
 import sys
 import time
 import json
+import tempfile
 import requests
 from datetime import datetime, timezone
+from pathlib import Path
 from dotenv import load_dotenv
+
+import extract_audio
 
 load_dotenv()
 
@@ -15,7 +19,16 @@ LOG_FILE = "results_log.jsonl"
 
 
 def submit_track(source, mock=None):
-    """Submit a public audio URL, or a local file path (uploaded directly)."""
+    """Submit a public audio URL, or a local file path (uploaded directly).
+
+    A local video file has its audio extracted first (needs ffmpeg).
+    """
+    if os.path.isfile(source) and extract_audio.is_video(source):
+        with tempfile.TemporaryDirectory() as tmp:
+            wav = os.path.join(tmp, Path(source).stem + ".wav")
+            extract_audio.extract_audio(source, wav)
+            return submit_track(wav, mock=mock)
+
     params = {"mock": mock} if mock else {}
     if os.path.isfile(source):
         with open(source, "rb") as f:

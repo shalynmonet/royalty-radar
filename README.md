@@ -34,18 +34,13 @@ HUMANSTANDARD_API_KEY=your_key_here
 ## Usage
 
 ```bash
-# 1. (optional) pull audio out of a video
-python extract_audio.py clip.mp4 extracted_audio.wav
-
-# 2. the API needs a publicly reachable URL, not a local path. Serve the folder
-#    and tunnel it, e.g. with cloudflared:
-python -m http.server 8000
-cloudflared tunnel --url http://localhost:8000
-
-# 3. scan it: a public URL...
-python detect.py https://<your-tunnel>.trycloudflare.com/extracted_audio.wav
-#    ...or a local file, uploaded directly (no tunnel needed)
+# scan a local audio or video file. Video audio is extracted with ffmpeg first.
 python detect.py path/to/song.mp3
+python detect.py path/to/clip.mp4
+
+# or a public URL
+# (if you need one for a local file, serve it and tunnel it, e.g. with cloudflared)
+python detect.py https://<your-tunnel>.trycloudflare.com/extracted_audio.wav
 
 # several at once, one summary table
 python scan_batch.py path/to/a.mp3 https://example.com/b.wav
@@ -74,7 +69,7 @@ scans run by an agent through `scan_batch.py`).
 
 ```
 detect.py         submit, poll, branch on verdict, log
-extract_audio.py  ffmpeg wrapper: video -> WAV
+extract_audio.py  ffmpeg wrapper: video -> WAV (used automatically for video files)
 check_job.py      look up an existing job_id
 scan_batch.py     scan several sources, print one verdict table
 app.py            optional Streamlit dashboard

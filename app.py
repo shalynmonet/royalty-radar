@@ -15,6 +15,7 @@ except KeyError as e:  # HUMANSTANDARD_API_KEY not set
 
 LOG_FILE = Path(__file__).parent / "results_log.jsonl"
 AUDIO_TYPES = ["mp3", "wav", "m4a", "flac", "ogg", "aac"]
+VIDEO_TYPES = ["mp4", "mov", "mkv", "webm", "avi", "m4v"]
 MOCKS = ["Real scan (1 credit)", "human", "ai", "suspicious", "no_vocal"]
 
 OUTPUTS = {
@@ -72,7 +73,11 @@ with scan_tab:
     if mock:
         st.info(f"Mock scenario '{mock}': canned result, no credits spent.")
 
-    upload = st.file_uploader("Audio file", type=AUDIO_TYPES)
+    upload = st.file_uploader(
+        "Audio or video file",
+        type=AUDIO_TYPES + VIDEO_TYPES,
+        help="For a video, the audio track is extracted with ffmpeg before scanning.",
+    )
     url = st.text_input("...or a public audio URL")
 
     if st.button("Scan", type="primary", disabled=DETECT_ERROR is not None):
@@ -91,6 +96,8 @@ with scan_tab:
                     source = display = url.strip()
 
                 with st.status("Scanning. The first real scan can take 20-30 seconds...") as status:
+                    if upload and Path(upload.name).suffix.lower().lstrip(".") in VIDEO_TYPES:
+                        status.update(label="Extracting audio from the video, then submitting...")
                     job_id = detect.submit_track(source, mock=mock)
                     status.update(label=f"Job {job_id} submitted, waiting for the verdict...")
                     result = detect.poll_job(job_id)
