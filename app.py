@@ -139,7 +139,9 @@ with scan_tab:
 with listen_tab:
     st.write(
         "Play music near your device's microphone, record 15-30 seconds, then scan it. "
-        "Room noise lowers accuracy, so treat a result here as a first look."
+        "Room noise lowers accuracy, so treat a result here as a first look. "
+        "If sending the recording to the app doesn't work, use Save recording and upload "
+        "the file in Check a track."
     )
     recorded = wav_recorder(key="wav_recorder", default=None)
     if recorded:
