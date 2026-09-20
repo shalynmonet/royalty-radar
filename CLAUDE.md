@@ -10,8 +10,10 @@ and acts on the verdict. The user is an independent artist, label or manager.
 - Free test run, no credits spent: add a mock scenario, one of
   `human`, `ai`, `suspicious`, `no_vocal` (`python detect.py <url> ai`,
   `python scan_batch.py --mock ai <url>`)
-- Video source: `python extract_audio.py <video> out.wav`, then host it at a
-  public URL (the API cannot read local paths)
+- Sources can be a public audio URL or a local file path (uploaded directly).
+  Streaming-service page links (Spotify, YouTube) are not audio files and will
+  not work.
+- Video source: `python extract_audio.py <video> out.wav`, then scan the WAV
 
 Real scans cost 1 credit each from a shared pool of 200. Use mock scenarios
 unless the user asks for a real scan, and never rescan a URL that already has an

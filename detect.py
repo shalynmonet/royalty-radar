@@ -14,14 +14,26 @@ HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 LOG_FILE = "results_log.jsonl"
 
 
-def submit_track(file_url, mock=None):
+def submit_track(source, mock=None):
+    """Submit a public audio URL, or a local file path (uploaded directly)."""
     params = {"mock": mock} if mock else {}
-    response = requests.post(
-        f"{BASE_URL}/api/analyze",
-        headers=HEADERS,
-        params=params,
-        json={"url": file_url}
-    )
+    if os.path.isfile(source):
+        with open(source, "rb") as f:
+            response = requests.post(
+                f"{BASE_URL}/api/analyze",
+                headers=HEADERS,
+                params=params,
+                files={"file": (os.path.basename(source), f)},
+                timeout=300,
+            )
+    else:
+        response = requests.post(
+            f"{BASE_URL}/api/analyze",
+            headers=HEADERS,
+            params=params,
+            json={"url": source},
+            timeout=60,
+        )
     response.raise_for_status()
     return response.json()["job_id"]
 

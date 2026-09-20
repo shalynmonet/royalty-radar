@@ -42,8 +42,13 @@ python extract_audio.py clip.mp4 extracted_audio.wav
 python -m http.server 8000
 cloudflared tunnel --url http://localhost:8000
 
-# 3. scan it
+# 3. scan it: a public URL...
 python detect.py https://<your-tunnel>.trycloudflare.com/extracted_audio.wav
+#    ...or a local file, uploaded directly (no tunnel needed)
+python detect.py path/to/song.mp3
+
+# several at once, one summary table
+python scan_batch.py path/to/a.mp3 https://example.com/b.wav
 
 # free test run against the API's mock scenarios (human, ai, suspicious, no_vocal)
 python detect.py https://example.com/any.wav suspicious
