@@ -8,7 +8,7 @@ verdict:
 | Verdict | Output |
 |---|---|
 | `human` | Certificate of human authorship |
-| `ai` at 80%+ confidence | Drafted consent-and-revenue-share outreach email to whoever posted it, written as an independent artist or as a label representative (`--sender artist|label`, or the dropdown in the dashboard) |
+| `ai` at 80%+ confidence | Drafted consent-and-revenue-share outreach email to whoever posted it, written as an independent artist or as a label representative (`--sender artist` or `--sender label`, or the dropdown in the dashboard) |
 | anything else (`uncertain`, `suspicious`, `no_vocal`, unexpected, or `ai` below 80% confidence) | Flagged for manual review. Never guessed on. |
 
 Detection is done by the [HumanStandard](https://app.jobsbyhumans.com) API. Every
