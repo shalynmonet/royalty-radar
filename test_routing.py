@@ -1,4 +1,5 @@
 """Run with: python -m unittest -v   (no network, no credits, no dependencies beyond the app's)."""
+import json
 import os
 import tempfile
 import unittest
@@ -33,6 +34,26 @@ class RoutingTests(unittest.TestCase):
         for verdict in ("suspicious", "uncertain", "no_vocal", "something_new", None):
             with self.subTest(verdict=verdict):
                 self.assertEqual(self.route({"verdict": verdict, "confidence": 0.61})[0], "review")
+
+    def test_low_confidence_ai_goes_to_review_not_outreach(self):
+        # The real case from the demo: verdict "ai" at 7.2% confidence.
+        kind, text = self.route({"verdict": "ai", "confidence": 0.072, "origin": "unknown"})
+        self.assertEqual(kind, "review")
+        self.assertIn("LOW CONFIDENCE", text)
+        self.assertNotIn("Subject:", text)
+
+    def test_outreach_threshold_boundary(self):
+        floor = detect.AI_OUTREACH_MIN_CONFIDENCE
+        self.assertEqual(self.route({"verdict": "ai", "confidence": floor})[0], "outreach")
+        self.assertEqual(self.route({"verdict": "ai", "confidence": floor - 0.01})[0], "review")
+        self.assertEqual(self.route({"verdict": "ai", "confidence": None})[0], "review")
+
+    def test_log_records_job_id_and_extra_fields(self):
+        with mock.patch("builtins.print"):
+            detect.handle_result("x", {"verdict": "human", "confidence": 0.9, "ai_probability": 0.1}, job_id="job-1")
+        entry = json.loads(detect.LOG_FILE.read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(entry["job_id"], "job-1")
+        self.assertEqual(entry["ai_probability"], 0.1)
 
     def test_missing_or_null_fields_never_crash_any_route(self):
         for verdict in ("human", "ai", "suspicious", None):
@@ -72,7 +93,7 @@ class OutreachTests(unittest.TestCase):
         self.assertNotIn("independent artist", text)
 
     def test_no_none_when_origin_missing(self):
-        for origin in (None, ""):
+        for origin in (None, "", "unknown", "Unknown", "none", "human"):
             text = outreach.generate_outreach_email({"confidence": 0.61, "origin": origin})
             self.assertNotIn("None", text)
             self.assertNotIn("possible origin", text)

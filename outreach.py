@@ -6,6 +6,17 @@ fill in before sending anything.
 
 SENDERS = ("artist", "label")
 
+# Origin values the API returns that carry no information about where a track came from.
+NO_ORIGIN = {"", "unknown", "none", "n/a", "human"}
+
+
+def usable_origin(result):
+    """The detector's guess at the generating tool, or None if it gave no real answer."""
+    origin = result.get("origin")
+    if origin and str(origin).strip().lower() not in NO_ORIGIN:
+        return str(origin).strip()
+    return None
+
 ARTIST_TEMPLATE = """Subject: A question about your track "[Track title]"
 
 Hi [Their name],
@@ -44,7 +55,8 @@ def generate_outreach_email(result, sender="artist"):
         raise ValueError(f"sender must be one of {SENDERS}")
     confidence = (result.get("confidence") or 0) * 100
     flagged = f"{confidence:.0f}% confidence"
-    if result.get("origin"):
-        flagged = f"possible origin: {result['origin']}, {flagged}"
+    origin = usable_origin(result)
+    if origin:
+        flagged = f"possible origin: {origin}, {flagged}"
     template = LABEL_TEMPLATE if sender == "label" else ARTIST_TEMPLATE
     return template.replace("{flagged}", flagged)

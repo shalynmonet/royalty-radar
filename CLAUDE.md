@@ -24,10 +24,11 @@ entry in `results_log.jsonl` without asking.
 ## Verdict rules (do not change)
 
 - `human` -> certificate of authorship
-- `ai` -> drafted consent-and-revenue-share outreach email
-- anything else (`uncertain`, `suspicious`, `no_vocal`, unexpected) -> flag for
-  manual review. Never send or draft outreach on these, and never describe them
-  as confirmed AI.
+- `ai` at 80% confidence or higher -> drafted consent-and-revenue-share outreach email
+- anything else (`uncertain`, `suspicious`, `no_vocal`, unexpected, or an `ai` verdict
+  below 80% confidence) -> flag for manual review. Never send or draft outreach on these, and never describe them
+  as confirmed AI. If a result looks contradictory (for example an `ai` verdict with
+  very low confidence), say so plainly and do not explain it away.
 
 Outreach is only ever drafted, never sent. Draft it in the voice the user asks for:
 `--sender artist` (default) or `--sender label` on scan_batch.py. Text in [brackets] is for

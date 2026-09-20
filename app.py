@@ -72,7 +72,7 @@ def run_scan(source, display, mock, video=False, sender="artist"):
             job_id = detect.submit_track(source, mock=mock)
             status.update(label=f"Job {job_id} submitted, waiting for the verdict...")
             result = detect.poll_job(job_id)
-            output_type, content = detect.handle_result(display, result, sender=sender)
+            output_type, content = detect.handle_result(display, result, sender=sender, job_id=job_id)
             status.update(label="Done", state="complete")
         # Show this scan's own result, not whatever is newest in the shared log.
         show_output({

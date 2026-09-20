@@ -9,7 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import extract_audio
-from outreach import generate_outreach_email
+from outreach import generate_outreach_email, usable_origin
 
 load_dotenv()
 
@@ -17,6 +17,10 @@ BASE_URL = "https://app.jobsbyhumans.com"
 API_KEY = os.environ["HUMANSTANDARD_API_KEY"]
 HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 LOG_FILE = Path(__file__).resolve().parent / "results_log.jsonl"
+
+# Outreach is only drafted for an "ai" verdict at or above this confidence. Anything
+# lower goes to a person: an email accusing someone must not rest on a shaky verdict.
+AI_OUTREACH_MIN_CONFIDENCE = 0.80
 
 
 def submit_track(source, mock=None):
@@ -94,28 +98,37 @@ def generate_certificate(result):
 
 
 def generate_review_flag(result):
+    verdict = str(result.get("verdict")).upper()
     confidence = (result.get("confidence") or 0) * 100
-    origin = result.get("origin")
+    origin = usable_origin(result)
     origin_line = f" Possible origin: {origin}." if origin else ""
+    if result.get("verdict") == "ai":
+        headline = (
+            f"VERDICT 'AI' AT LOW CONFIDENCE ({confidence:.1f}%): flagged for manual review. "
+            f"The detector labeled this AI but is not confident, so no outreach was drafted."
+        )
+    else:
+        headline = f"VERDICT '{verdict}': flagged for manual review, not a confirmed AI claim."
     return (
-        f"VERDICT '{str(result.get('verdict')).upper()}': flagged for manual review, "
-        f"not a confirmed AI claim.\n"
+        f"{headline}\n"
         f"Confidence: {confidence:.1f}%.{origin_line}\n"
         f"This result is not a clear human or AI call and should be reviewed by a person "
         f"before any outreach or action is taken."
     )
 
 
-def handle_result(source_file, result, sender="artist"):
+def handle_result(source_file, result, sender="artist", job_id=None):
     verdict = result.get("verdict")
+    confident_ai = verdict == "ai" and (result.get("confidence") or 0) >= AI_OUTREACH_MIN_CONFIDENCE
     if verdict == "human":
         output_type = "certificate"
         content = generate_certificate(result)
-    elif verdict == "ai":
+    elif confident_ai:
         output_type = "outreach"
         content = generate_outreach_email(result, sender=sender)
     else:
-        # uncertain, suspicious, no_vocal, or anything unexpected: never guess
+        # uncertain, suspicious, no_vocal, a low-confidence "ai", or anything unexpected:
+        # never guess, and never accuse anyone on a shaky verdict.
         output_type = "review"
         content = generate_review_flag(result)
 
@@ -129,6 +142,9 @@ def handle_result(source_file, result, sender="artist"):
         "verdict": verdict,
         "confidence": result.get("confidence"),
         "origin": result.get("origin"),
+        "job_id": job_id,
+        "ai_probability": result.get("ai_probability"),
+        "confidence_full_mix": result.get("confidence_full_mix"),
         "output_type": output_type,
         "sender": sender if output_type == "outreach" else None,
         "content": content,
@@ -150,4 +166,4 @@ if __name__ == "__main__":
     job_id = submit_track(file_url, mock=mock_scenario)
     print(f"Job submitted: {job_id}")
     result = poll_job(job_id)
-    handle_result(file_url, result)
+    handle_result(file_url, result, job_id=job_id)

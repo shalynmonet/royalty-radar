@@ -8,8 +8,8 @@ verdict:
 | Verdict | Output |
 |---|---|
 | `human` | Certificate of human authorship |
-| `ai` | Drafted consent-and-revenue-share outreach email to whoever posted it, written as an independent artist or as a label representative (`--sender artist|label`, or the dropdown in the dashboard) |
-| anything else (`uncertain`, `suspicious`, `no_vocal`, unexpected) | Flagged for manual review. Never guessed on. |
+| `ai` at 80%+ confidence | Drafted consent-and-revenue-share outreach email to whoever posted it, written as an independent artist or as a label representative (`--sender artist|label`, or the dropdown in the dashboard) |
+| anything else (`uncertain`, `suspicious`, `no_vocal`, unexpected, or `ai` below 80% confidence) | Flagged for manual review. Never guessed on. |
 
 Detection is done by the [HumanStandard](https://app.jobsbyhumans.com) API. Every
 processed result is appended to `results_log.jsonl`.
@@ -85,7 +85,7 @@ python -m unittest -v   # routing, email drafts, polling, video detection; no ne
 
 ## Honesty about uncertainty
 
-The tool only drafts outreach on a clear `ai` verdict. Mid-confidence and
+The tool only drafts outreach on a confident `ai` verdict (`AI_OUTREACH_MIN_CONFIDENCE`, 80%). Mid-confidence and
 unrecognised verdicts are routed to a person, and the review note says so rather
 than implying an AI claim.
 

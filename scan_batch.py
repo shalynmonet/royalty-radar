@@ -14,7 +14,7 @@ def scan_all(urls, mock=None, sender="artist"):
         try:
             job_id = detect.submit_track(url, mock=mock)
             result = detect.poll_job(job_id)
-            output_type, _ = detect.handle_result(url, result, sender=sender)
+            output_type, _ = detect.handle_result(url, result, sender=sender, job_id=job_id)
             rows.append((url, result.get("verdict"), result.get("confidence"), output_type))
         except Exception as e:  # network, auth, job failure, timeout
             rows.append((url, "error", None, f"failed: {e}"))
