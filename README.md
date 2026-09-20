@@ -88,3 +88,7 @@ python -m unittest -v   # routing, email drafts, polling, video detection; no ne
 The tool only drafts outreach on a clear `ai` verdict. Mid-confidence and
 unrecognised verdicts are routed to a person, and the review note says so rather
 than implying an AI claim.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
