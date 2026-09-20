@@ -8,7 +8,7 @@ verdict:
 | Verdict | Output |
 |---|---|
 | `human` | Certificate of human authorship |
-| `ai` | Drafted consent-and-revenue-share outreach email to whoever posted it |
+| `ai` | Drafted consent-and-revenue-share outreach email to whoever posted it, written as an independent artist or as a label representative (`--sender artist|label`, or the dropdown in the dashboard) |
 | anything else (`uncertain`, `suspicious`, `no_vocal`, unexpected) | Flagged for manual review. Never guessed on. |
 
 Detection is done by the [HumanStandard](https://app.jobsbyhumans.com) API. Every
@@ -61,8 +61,8 @@ pip install -r requirements-ui.txt   # adds Streamlit; the core tool doesn't nee
 streamlit run app.py
 ```
 
-Two views: **Check a track** (upload a file or paste a URL, with a mock mode that
-costs no credits) and **Results** (everything in `results_log.jsonl`, including
+Views: **Check a track** (upload a file or paste a URL, with a mock mode that
+costs no credits) **Listen** (record from the microphone and scan; the recorder sends audio over Streamlit's own connection, so it also works behind cloud proxies that block uploads), and **Results** (everything in `results_log.jsonl`, including
 scans run by an agent through `scan_batch.py`).
 
 ## Files
@@ -72,6 +72,7 @@ detect.py         submit, poll, branch on verdict, log
 extract_audio.py  ffmpeg wrapper: video -> WAV (used automatically for video files)
 check_job.py      look up an existing job_id
 scan_batch.py     scan several sources, print one verdict table
+outreach.py       outreach email drafts: independent artist or label representative
 app.py            optional Streamlit dashboard
 ```
 

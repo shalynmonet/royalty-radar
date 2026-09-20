@@ -1,10 +1,14 @@
 """Royalty Radar dashboard. Run with: streamlit run app.py"""
+import base64
 import json
 import os
 import tempfile
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
+
+from outreach import SENDERS
 
 try:
     import detect
@@ -59,7 +63,7 @@ def source_name(source):
     return Path(source).name if "://" not in source else source.rsplit("/", 1)[-1] or source
 
 
-def run_scan(source, display, mock, video=False):
+def run_scan(source, display, mock, video=False, sender="artist"):
     """Submit, poll, log and show one scan."""
     try:
         with st.status("Scanning. The first real scan can take 20-30 seconds...") as status:
@@ -68,34 +72,49 @@ def run_scan(source, display, mock, video=False):
             job_id = detect.submit_track(source, mock=mock)
             status.update(label=f"Job {job_id} submitted, waiting for the verdict...")
             result = detect.poll_job(job_id)
-            detect.handle_result(display, result)
+            detect.handle_result(display, result, sender=sender)
             status.update(label="Done", state="complete")
         show_output(load_log()[0])
     except Exception as e:
         st.error(f"Scan failed: {e}")
 
 
-def scan_upload(upload, mock):
-    """Write an uploaded or recorded file to disk, scan it, clean up."""
-    suffix = Path(upload.name).suffix
+def scan_bytes(name, data, mock, sender):
+    """Write uploaded or recorded bytes to disk, scan them, clean up."""
+    suffix = Path(name).suffix
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(upload.getvalue())
+        tmp.write(data)
         tmp_path = tmp.name
     try:
-        run_scan(tmp_path, upload.name, mock, video=suffix.lower().lstrip(".") in VIDEO_TYPES)
+        run_scan(tmp_path, name, mock, video=suffix.lower().lstrip(".") in VIDEO_TYPES, sender=sender)
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
 
+# Records in the browser and sends the WAV to Python over Streamlit's own connection,
+# so it doesn't depend on the separate upload request that some proxies block.
+wav_recorder = components.declare_component(
+    "wav_recorder", path=str(Path(__file__).parent / "recorder_component")
+)
+
+
 if DETECT_ERROR:
     st.error(DETECT_ERROR)
-mode = st.selectbox(
+mode_col, voice_col = st.columns(2)
+mode = mode_col.selectbox(
     "Scan mode",
     MOCKS,
     help="Mock scenarios return canned results, ignore the audio, and cost no credits.",
 )
 mock = None if mode == MOCKS[0] else mode
+VOICES = {"An independent artist": "artist", "A label representative": "label"}
+voice = voice_col.selectbox(
+    "Outreach email is written as",
+    list(VOICES),
+    help="Only used when a track is flagged as AI. The email is a draft and is never sent.",
+)
+sender = VOICES[voice]
 if mock:
     st.info(f"Mock scenario '{mock}': canned result, no credits spent.")
 
@@ -111,9 +130,9 @@ with scan_tab:
 
     if st.button("Scan", type="primary", disabled=DETECT_ERROR is not None):
         if upload:
-            scan_upload(upload, mock)
+            scan_bytes(upload.name, upload.getvalue(), mock, sender)
         elif url.strip():
-            run_scan(url.strip(), url.strip(), mock)
+            run_scan(url.strip(), url.strip(), mock, sender=sender)
         else:
             st.warning("Choose a file or paste a URL first.")
 
@@ -122,10 +141,17 @@ with listen_tab:
         "Play music near your device's microphone, record 15-30 seconds, then scan it. "
         "Room noise lowers accuracy, so treat a result here as a first look."
     )
-    recording = st.audio_input("Record what's playing")
-    if recording is not None:
+    recorded = wav_recorder(key="wav_recorder", default=None)
+    if recorded:
+        st.caption(f"Recording ready: {recorded['seconds']:.1f} s.")
         if st.button("Scan recording", type="primary", disabled=DETECT_ERROR is not None):
-            scan_upload(recording, mock)
+            scan_bytes("recording.wav", base64.b64decode(recorded["b64"]), mock, sender)
+
+    with st.expander("Built-in recorder (works locally; may fail behind some cloud proxies)"):
+        builtin = st.audio_input("Record what's playing")
+        if builtin is not None:
+            if st.button("Scan built-in recording", disabled=DETECT_ERROR is not None):
+                scan_bytes(builtin.name, builtin.getvalue(), mock, sender)
 
 with results_tab:
     rows = load_log()

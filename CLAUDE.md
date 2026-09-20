@@ -29,7 +29,9 @@ entry in `results_log.jsonl` without asking.
   manual review. Never send or draft outreach on these, and never describe them
   as confirmed AI.
 
-Outreach is only ever drafted, never sent.
+Outreach is only ever drafted, never sent. Draft it in the voice the user asks for:
+`--sender artist` (default) or `--sender label` on scan_batch.py. Text in [brackets] is for
+the user to fill in; leave the brackets as they are.
 
 ## Reporting back
 

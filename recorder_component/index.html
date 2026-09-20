@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; font-family: "Source Sans", "Source Sans Pro", system-ui, sans-serif; font-size: 14px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(128,128,128,0.12); }
+  button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(128,128,128,0.5); background: transparent; color: inherit; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #rec.on { background: #d33; border-color: #d33; color: #fff; }
+  #timer { font-variant-numeric: tabular-nums; min-width: 44px; }
+  #meter { flex: 1; height: 6px; border-radius: 3px; background: rgba(128,128,128,0.25); overflow: hidden; }
+  #level { height: 100%; width: 0; background: #3a3; }
+  #status { margin-top: 8px; opacity: 0.8; }
+  audio { width: 100%; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="row">
+  <button id="rec">Start recording</button>
+  <span id="timer">0:00</span>
+  <div id="meter"><div id="level"></div></div>
+</div>
+<div id="status">Uses your microphone. Recording stops automatically after 60 seconds.</div>
+<audio id="player" controls hidden></audio>
+
+<script>
+  var MAX_SECONDS = 60;
+  var recBtn = document.getElementById("rec");
+  var timerEl = document.getElementById("timer");
+  var levelEl = document.getElementById("level");
+  var statusEl = document.getElementById("status");
+  var player = document.getElementById("player");
+
+  // Streamlit component protocol: plain postMessage, no build step.
+  function send(type, data) {
+    window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data), "*");
+  }
+  // Never report less than the controls need: the frame can be measured while its tab is hidden.
+  function setHeight() {
+    send("streamlit:setFrameHeight", { height: Math.max(96, document.body.scrollHeight + 8) });
+  }
+  if (window.ResizeObserver) new ResizeObserver(setHeight).observe(document.body);
+  window.addEventListener("resize", setHeight);
+  document.addEventListener("visibilitychange", setHeight);
+
+  var ctx = null, stream = null, processor = null, source = null;
+  var chunks = [], sampleRate = 44100, startedAt = 0, ticker = null, recording = false;
+
+  function encodeWav(chunks, rate) {
+    var length = 0;
+    chunks.forEach(function (c) { length += c.length; });
+    var buffer = new ArrayBuffer(44 + length * 2);
+    var view = new DataView(buffer);
+    function str(off, s) { for (var i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); }
+    str(0, "RIFF"); view.setUint32(4, 36 + length * 2, true); str(8, "WAVE"); str(12, "fmt ");
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true);
+    view.setUint16(32, 2, true); view.setUint16(34, 16, true); str(36, "data");
+    view.setUint32(40, length * 2, true);
+    var off = 44;
+    chunks.forEach(function (c) {
+      for (var i = 0; i < c.length; i++) {
+        var s = Math.max(-1, Math.min(1, c[i]));
+        view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        off += 2;
+      }
+    });
+    return new Blob([view], { type: "audio/wav" });
+  }
+
+  function fail(msg) {
+    statusEl.textContent = msg;
+    recBtn.disabled = false;
+    setHeight();
+  }
+
+  async function start() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return fail("This browser or page can't use the microphone (it needs https or localhost).");
+    }
+    try {
+      // Music capture: turn off the voice-call processing that would mangle it.
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }
+      });
+    } catch (e) {
+      return fail("Microphone unavailable: " + (e && e.name ? e.name : e) + ". Allow it in the site settings and try again.");
+    }
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    sampleRate = ctx.sampleRate;
+    source = ctx.createMediaStreamSource(stream);
+    processor = ctx.createScriptProcessor(4096, 1, 1);
+    chunks = [];
+    processor.onaudioprocess = function (e) {
+      var data = e.inputBuffer.getChannelData(0);
+      chunks.push(new Float32Array(data));
+      var peak = 0;
+      for (var i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+      levelEl.style.width = Math.min(100, peak * 140) + "%";
+    };
+    source.connect(processor);
+    processor.connect(ctx.destination);
+    recording = true;
+    startedAt = Date.now();
+    player.hidden = true;
+    recBtn.textContent = "Stop";
+    recBtn.className = "on";
+    statusEl.textContent = "Recording...";
+    ticker = setInterval(function () {
+      var s = Math.floor((Date.now() - startedAt) / 1000);
+      timerEl.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+      if (s >= MAX_SECONDS) stop();
+    }, 250);
+    setHeight();
+  }
+
+  function stop() {
+    if (!recording) return;
+    recording = false;
+    clearInterval(ticker);
+    processor.disconnect(); source.disconnect();
+    stream.getTracks().forEach(function (t) { t.stop(); });
+    ctx.close();
+    levelEl.style.width = "0";
+    recBtn.textContent = "Record again";
+    recBtn.className = "";
+    var blob = encodeWav(chunks, sampleRate);
+    var seconds = chunks.reduce(function (n, c) { return n + c.length; }, 0) / sampleRate;
+    player.src = URL.createObjectURL(blob);
+    player.hidden = false;
+    statusEl.textContent = "Recorded " + seconds.toFixed(1) + " s. Sending to the app...";
+    var reader = new FileReader();
+    reader.onloadend = function () {
+      var b64 = String(reader.result).split(",")[1];
+      // Goes to Python over Streamlit's own connection, not a separate upload request.
+      send("streamlit:setComponentValue", {
+        value: { b64: b64, seconds: seconds, sample_rate: sampleRate, id: Date.now() },
+        dataType: "json"
+      });
+      statusEl.textContent = "Recorded " + seconds.toFixed(1) + " s. Ready: press Scan recording below.";
+      setHeight();
+    };
+    reader.readAsDataURL(blob);
+    setHeight();
+  }
+
+  recBtn.addEventListener("click", function () { recording ? stop() : start(); });
+  window.addEventListener("message", function () { /* render args are unused */ });
+  send("streamlit:componentReady", { apiVersion: 1 });
+  setHeight();
+</script>
+</body>
+</html>

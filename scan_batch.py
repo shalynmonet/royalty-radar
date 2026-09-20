@@ -3,7 +3,7 @@ import sys
 import detect
 
 
-def scan_all(urls, mock=None):
+def scan_all(urls, mock=None, sender="artist"):
     """Scan each URL and return (url, verdict, confidence, output_type) rows.
 
     One failing URL is reported in the table and does not stop the batch.
@@ -13,7 +13,7 @@ def scan_all(urls, mock=None):
         try:
             job_id = detect.submit_track(url, mock=mock)
             result = detect.poll_job(job_id)
-            output_type, _ = detect.handle_result(url, result)
+            output_type, _ = detect.handle_result(url, result, sender=sender)
             rows.append((url, result.get("verdict"), result.get("confidence"), output_type))
         except Exception as e:  # network, auth, job failure, timeout
             rows.append((url, "error", None, f"failed: {e}"))
@@ -34,7 +34,15 @@ if __name__ == "__main__":
         i = args.index("--mock")
         mock = args[i + 1]
         del args[i:i + 2]
+    sender = "artist"
+    if "--sender" in args:
+        i = args.index("--sender")
+        sender = args[i + 1]
+        del args[i:i + 2]
+        if sender not in detect.SENDERS:
+            print(f"--sender must be one of: {', '.join(detect.SENDERS)}")
+            sys.exit(1)
     if not args:
-        print("Usage: python scan_batch.py [--mock scenario] <url> [<url> ...]")
+        print("Usage: python scan_batch.py [--mock scenario] [--sender artist|label] <source> [<source> ...]")
         sys.exit(1)
-    print_table(scan_all(args, mock=mock))
+    print_table(scan_all(args, mock=mock, sender=sender))

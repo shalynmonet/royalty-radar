@@ -9,6 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import extract_audio
+from outreach import SENDERS, generate_outreach_email  # noqa: F401
 
 load_dotenv()
 
@@ -99,26 +100,14 @@ def generate_review_flag(result):
     )
 
 
-def generate_outreach_email(result):
-    origin = result.get("origin", "an AI model")
-    confidence = result.get("confidence", 0) * 100
-    return (
-        f"Hi, I'm reaching out because a recent scan flagged a track you posted as likely "
-        f"AI-generated (possible origin: {origin}, {confidence:.0f}% confidence). "
-        f"If it was trained on or styled after an artist's work, I'd rather turn this into a "
-        f"conversation about fair credit, consent and revenue share than a dispute. "
-        f"Would you be open to connecting so we can find a fair path forward?"
-    )
-
-
-def handle_result(source_file, result):
+def handle_result(source_file, result, sender="artist"):
     verdict = result.get("verdict")
     if verdict == "human":
         output_type = "certificate"
         content = generate_certificate(result)
     elif verdict == "ai":
         output_type = "outreach"
-        content = generate_outreach_email(result)
+        content = generate_outreach_email(result, sender=sender)
     else:
         # uncertain, suspicious, no_vocal, or anything unexpected: never guess
         output_type = "review"
@@ -135,6 +124,7 @@ def handle_result(source_file, result):
         "confidence": result.get("confidence"),
         "origin": result.get("origin"),
         "output_type": output_type,
+        "sender": sender if output_type == "outreach" else None,
         "content": content,
     }
     with open(LOG_FILE, "a") as f:
