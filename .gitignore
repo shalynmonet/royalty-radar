@@ -1,0 +1,17 @@
+.env
+__pycache__/
+*.pyc
+venv/
+.venv/
+Thumbs.db
+
+# runtime output and media (may contain tunnel URLs / personal content)
+results_log.jsonl
+extracted_audio.wav
+*.mp4
+*.mov
+*.mp3
+*.wav
+
+# local handoff notes
+HANDOFF.md
