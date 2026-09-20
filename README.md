@@ -62,7 +62,7 @@ streamlit run app.py
 ```
 
 Views: **Check a track** (upload a file or paste a URL, with a mock mode that
-costs no credits) **Listen** (record from the microphone and scan; the recorder sends audio over Streamlit's own connection, so it also works behind cloud proxies that block uploads), and **Results** (everything in `results_log.jsonl`, including
+costs no credits) **Listen** (record from the microphone and scan; the recorder sends audio over Streamlit's own connection instead of a separate upload request, which is meant to help behind cloud proxies that block uploads), and **Results** (everything in `results_log.jsonl`, including
 scans run by an agent through `scan_batch.py`).
 
 ## Files
