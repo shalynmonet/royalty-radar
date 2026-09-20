@@ -59,7 +59,11 @@ def poll_job(job_id, timeout=180, interval=3):
 
 
 def generate_certificate(result):
-    evidence = result.get("origin_map", {}).get("summary_line", "No detailed evidence available.")
+    summary = result.get("origin_map", {}).get("summary_line")
+    evidence = summary or (
+        "No reference-recording evidence returned. Based on full-mix analysis only; "
+        "this does not confirm the track contains vocals or verify authorship."
+    )
     return (
         f"CERTIFICATE OF HUMAN AUTHORSHIP\n"
         f"Verdict: {result['verdict'].upper()} ({result['confidence']*100:.1f}% confidence)\n"
