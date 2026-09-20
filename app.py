@@ -59,20 +59,49 @@ def source_name(source):
     return Path(source).name if "://" not in source else source.rsplit("/", 1)[-1] or source
 
 
-scan_tab, results_tab = st.tabs(["Check a track", "Results"])
+def run_scan(source, display, mock, video=False):
+    """Submit, poll, log and show one scan."""
+    try:
+        with st.status("Scanning. The first real scan can take 20-30 seconds...") as status:
+            if video:
+                status.update(label="Extracting audio from the video, then submitting...")
+            job_id = detect.submit_track(source, mock=mock)
+            status.update(label=f"Job {job_id} submitted, waiting for the verdict...")
+            result = detect.poll_job(job_id)
+            detect.handle_result(display, result)
+            status.update(label="Done", state="complete")
+        show_output(load_log()[0])
+    except Exception as e:
+        st.error(f"Scan failed: {e}")
+
+
+def scan_upload(upload, mock):
+    """Write an uploaded or recorded file to disk, scan it, clean up."""
+    suffix = Path(upload.name).suffix
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(upload.getvalue())
+        tmp_path = tmp.name
+    try:
+        run_scan(tmp_path, upload.name, mock, video=suffix.lower().lstrip(".") in VIDEO_TYPES)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+if DETECT_ERROR:
+    st.error(DETECT_ERROR)
+mode = st.selectbox(
+    "Scan mode",
+    MOCKS,
+    help="Mock scenarios return canned results, ignore the audio, and cost no credits.",
+)
+mock = None if mode == MOCKS[0] else mode
+if mock:
+    st.info(f"Mock scenario '{mock}': canned result, no credits spent.")
+
+scan_tab, listen_tab, results_tab = st.tabs(["Check a track", "Listen", "Results"])
 
 with scan_tab:
-    if DETECT_ERROR:
-        st.error(DETECT_ERROR)
-    mode = st.selectbox(
-        "Scan mode",
-        MOCKS,
-        help="Mock scenarios return canned results, ignore the audio, and cost no credits.",
-    )
-    mock = None if mode == MOCKS[0] else mode
-    if mock:
-        st.info(f"Mock scenario '{mock}': canned result, no credits spent.")
-
     upload = st.file_uploader(
         "Audio or video file",
         type=AUDIO_TYPES + VIDEO_TYPES,
@@ -81,34 +110,22 @@ with scan_tab:
     url = st.text_input("...or a public audio URL")
 
     if st.button("Scan", type="primary", disabled=DETECT_ERROR is not None):
-        if not upload and not url.strip():
-            st.warning("Choose a file or paste a URL first.")
+        if upload:
+            scan_upload(upload, mock)
+        elif url.strip():
+            run_scan(url.strip(), url.strip(), mock)
         else:
-            tmp_path = None
-            try:
-                if upload:
-                    suffix = Path(upload.name).suffix
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                        tmp.write(upload.getvalue())
-                        tmp_path = tmp.name
-                    source, display = tmp_path, upload.name
-                else:
-                    source = display = url.strip()
+            st.warning("Choose a file or paste a URL first.")
 
-                with st.status("Scanning. The first real scan can take 20-30 seconds...") as status:
-                    if upload and Path(upload.name).suffix.lower().lstrip(".") in VIDEO_TYPES:
-                        status.update(label="Extracting audio from the video, then submitting...")
-                    job_id = detect.submit_track(source, mock=mock)
-                    status.update(label=f"Job {job_id} submitted, waiting for the verdict...")
-                    result = detect.poll_job(job_id)
-                    output_type, _ = detect.handle_result(display, result)
-                    status.update(label="Done", state="complete")
-                show_output(load_log()[0])
-            except Exception as e:
-                st.error(f"Scan failed: {e}")
-            finally:
-                if tmp_path and os.path.exists(tmp_path):
-                    os.remove(tmp_path)
+with listen_tab:
+    st.write(
+        "Play music near your device's microphone, record 15-30 seconds, then scan it. "
+        "Room noise lowers accuracy, so treat a result here as a first look."
+    )
+    recording = st.audio_input("Record what's playing")
+    if recording is not None:
+        if st.button("Scan recording", type="primary", disabled=DETECT_ERROR is not None):
+            scan_upload(recording, mock)
 
 with results_tab:
     rows = load_log()
