@@ -12,6 +12,10 @@ extracted_audio.wav
 *.mov
 *.mp3
 *.wav
+*.m4a
+*.flac
+*.aac
+*.ogg
 
 # local handoff notes
 HANDOFF.md
