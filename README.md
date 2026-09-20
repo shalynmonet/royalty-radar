@@ -72,8 +72,15 @@ detect.py         submit, poll, branch on verdict, log
 extract_audio.py  ffmpeg wrapper: video -> WAV (used automatically for video files)
 check_job.py      look up an existing job_id
 scan_batch.py     scan several sources, print one verdict table
+test_routing.py   unit tests (standard library only)
 outreach.py       outreach email drafts: independent artist or label representative
 app.py            optional Streamlit dashboard
+```
+
+## Tests
+
+```bash
+python -m unittest -v   # routing, email drafts, polling, video detection; no network, no credits
 ```
 
 ## Honesty about uncertainty

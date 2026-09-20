@@ -9,14 +9,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import extract_audio
-from outreach import SENDERS, generate_outreach_email  # noqa: F401
+from outreach import generate_outreach_email
 
 load_dotenv()
 
 BASE_URL = "https://app.jobsbyhumans.com"
 API_KEY = os.environ["HUMANSTANDARD_API_KEY"]
 HEADERS = {"Authorization": f"Bearer {API_KEY}"}
-LOG_FILE = "results_log.jsonl"
+LOG_FILE = Path(__file__).resolve().parent / "results_log.jsonl"
 
 
 def submit_track(source, mock=None):
@@ -55,13 +55,19 @@ def submit_track(source, mock=None):
 def poll_job(job_id, timeout=180, interval=3):
     start = time.time()
     while time.time() - start < timeout:
-        response = requests.get(
-            f"{BASE_URL}/api/jobs/{job_id}/status",
-            headers=HEADERS,
-            timeout=30
-        )
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response = requests.get(
+                f"{BASE_URL}/api/jobs/{job_id}/status",
+                headers=HEADERS,
+                timeout=30
+            )
+            if response.status_code < 500:
+                response.raise_for_status()  # 4xx (bad key, unknown job) is not transient
+                data = response.json()
+            else:
+                data = {"status": f"server error {response.status_code}"}
+        except (requests.ConnectionError, requests.Timeout):
+            data = {"status": "network error"}
         status = data.get("status")
         if status == "complete":
             return data["result"]
@@ -73,14 +79,14 @@ def poll_job(job_id, timeout=180, interval=3):
 
 
 def generate_certificate(result):
-    summary = result.get("origin_map", {}).get("summary_line")
+    summary = (result.get("origin_map") or {}).get("summary_line")
     evidence = summary or (
         "No reference-recording evidence returned. Based on full-mix analysis only; "
         "this does not confirm the track contains vocals or verify authorship."
     )
     return (
         f"CERTIFICATE OF HUMAN AUTHORSHIP\n"
-        f"Verdict: {result['verdict'].upper()} ({result['confidence']*100:.1f}% confidence)\n"
+        f"Verdict: {str(result.get('verdict')).upper()} ({(result.get('confidence') or 0)*100:.1f}% confidence)\n"
         f"Evidence: {evidence}\n"
         f"Model: {result.get('model_version')}\n"
         f"Processed: {result.get('processed_at')}"
@@ -88,7 +94,7 @@ def generate_certificate(result):
 
 
 def generate_review_flag(result):
-    confidence = result.get("confidence", 0) * 100
+    confidence = (result.get("confidence") or 0) * 100
     origin = result.get("origin")
     origin_line = f" Possible origin: {origin}." if origin else ""
     return (
@@ -127,7 +133,7 @@ def handle_result(source_file, result, sender="artist"):
         "sender": sender if output_type == "outreach" else None,
         "content": content,
     }
-    with open(LOG_FILE, "a") as f:
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(log_entry) + "\n")
 
     return output_type, content

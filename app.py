@@ -8,8 +8,6 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-from outreach import SENDERS
-
 try:
     import detect
     DETECT_ERROR = None
@@ -42,9 +40,11 @@ def load_log():
     rows = []
     for line in LOG_FILE.read_text(encoding="utf-8").splitlines():
         try:
-            rows.append(json.loads(line))
+            row = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if isinstance(row, dict) and row.get("output_type"):  # skip malformed lines
+            rows.append(row)
     return list(reversed(rows))  # newest first
 
 
@@ -56,7 +56,7 @@ def show_output(entry):
     cols[0].metric("Verdict", str(entry.get("verdict")).upper())
     cols[1].metric("Confidence", f"{conf * 100:.1f}%" if conf is not None else "n/a")
     cols[2].metric("Possible origin", entry.get("origin") or "none")
-    st.code(entry["content"], language=None, wrap_lines=True)
+    st.code(entry.get("content") or "", language=None, wrap_lines=True)
 
 
 def source_name(source):
@@ -72,9 +72,16 @@ def run_scan(source, display, mock, video=False, sender="artist"):
             job_id = detect.submit_track(source, mock=mock)
             status.update(label=f"Job {job_id} submitted, waiting for the verdict...")
             result = detect.poll_job(job_id)
-            detect.handle_result(display, result, sender=sender)
+            output_type, content = detect.handle_result(display, result, sender=sender)
             status.update(label="Done", state="complete")
-        show_output(load_log()[0])
+        # Show this scan's own result, not whatever is newest in the shared log.
+        show_output({
+            "verdict": result.get("verdict"),
+            "confidence": result.get("confidence"),
+            "origin": result.get("origin"),
+            "output_type": output_type,
+            "content": content,
+        })
     except Exception as e:
         st.error(f"Scan failed: {e}")
 
@@ -144,7 +151,7 @@ with listen_tab:
         "the file in Check a track."
     )
     recorded = wav_recorder(key="wav_recorder", default=None)
-    if recorded:
+    if recorded and recorded.get("seconds", 0) >= 1:
         st.caption(f"Recording ready: {recorded['seconds']:.1f} s.")
         if st.button("Scan recording", type="primary", disabled=DETECT_ERROR is not None):
             scan_bytes("recording.wav", base64.b64decode(recorded["b64"]), mock, sender)
@@ -172,7 +179,7 @@ with results_tab:
             label, color = OUTPUTS.get(r["output_type"], (r["output_type"], "gray"))
             conf = r.get("confidence")
             conf_txt = f"{conf * 100:.1f}%" if conf is not None else "n/a"
-            title = f":{color}[{label.split(' (')[0]}] {source_name(r['source_file'])} ({conf_txt})"
+            title = f":{color}[{label.split(' (')[0]}] {source_name(r.get('source_file') or 'unknown')} ({conf_txt})"
             with st.expander(title):
                 st.caption(r.get("timestamp", ""))
                 show_output(r)

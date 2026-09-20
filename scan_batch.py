@@ -1,6 +1,7 @@
 import sys
 
 import detect
+from outreach import SENDERS
 
 
 def scan_all(urls, mock=None, sender="artist"):
@@ -27,21 +28,26 @@ def print_table(rows):
         print(f"{str(verdict):<12}{conf:>7}  {output_type:<12}{url}")
 
 
+def take_option(args, name):
+    """Remove `name value` from args and return value, or None if absent."""
+    if name not in args:
+        return None
+    i = args.index(name)
+    if i + 1 >= len(args) or args[i + 1].startswith("--"):
+        print(f"{name} needs a value")
+        sys.exit(1)
+    value = args[i + 1]
+    del args[i:i + 2]
+    return value
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
-    mock = None
-    if "--mock" in args:
-        i = args.index("--mock")
-        mock = args[i + 1]
-        del args[i:i + 2]
-    sender = "artist"
-    if "--sender" in args:
-        i = args.index("--sender")
-        sender = args[i + 1]
-        del args[i:i + 2]
-        if sender not in detect.SENDERS:
-            print(f"--sender must be one of: {', '.join(detect.SENDERS)}")
-            sys.exit(1)
+    mock = take_option(args, "--mock")
+    sender = take_option(args, "--sender") or "artist"
+    if sender not in SENDERS:
+        print(f"--sender must be one of: {', '.join(SENDERS)}")
+        sys.exit(1)
     if not args:
         print("Usage: python scan_batch.py [--mock scenario] [--sender artist|label] <source> [<source> ...]")
         sys.exit(1)

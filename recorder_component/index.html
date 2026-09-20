@@ -141,6 +141,11 @@
     recBtn.className = "";
     var blob = encodeWav(chunks, sampleRate);
     var seconds = chunks.reduce(function (n, c) { return n + c.length; }, 0) / sampleRate;
+    if (seconds < 1) {  // an accidental click: don't send a near-empty file to be scanned
+      statusEl.textContent = "Too short. Record at least a second or two.";
+      setHeight();
+      return;
+    }
     player.src = URL.createObjectURL(blob);
     player.hidden = false;
     showSaved(blob);
